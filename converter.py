@@ -646,6 +646,17 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
         for col_name, val in image_settings.items():
             if val.strip():
                 final_result_df[col_name] = val
+
+    # 画像コメントクリーンアップ処理
+    for i in range(1, 11):
+        img_col = f"画像{i}"
+        comment_col = f"画像{i}コメント"
+        if comment_col in final_result_df.columns:
+            if img_col in final_result_df.columns:
+                is_empty = final_result_df[img_col].fillna("").astype(str).str.strip() == ""
+                final_result_df.loc[is_empty, comment_col] = ""
+            else:
+                final_result_df[comment_col] = ""
                 
     expected_columns = [
         "管理番号", "カテゴリ", "タイトル", "説明", "ストア内商品検索用キーワード", 
