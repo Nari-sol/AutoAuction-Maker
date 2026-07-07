@@ -166,6 +166,21 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">')
                     
                 import re
+                
+                match_center = re.search(r"<\s*center\s*>(.*?)<\s*/center\s*>", add1, flags=re.IGNORECASE | re.DOTALL)
+                if match_center:
+                    center_inner = match_center.group(1)
+                    img_matches = list(re.finditer(r"<\s*img\b[^>]*>", center_inner, flags=re.IGNORECASE))
+                    if len(img_matches) >= 3:
+                        second_img_end = img_matches[1].end()
+                        extracted_images = center_inner[second_img_end:]
+                        extracted_images = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", extracted_images)
+                        
+                        match_last_center = list(re.finditer(r"<\s*/center\s*>", html, flags=re.IGNORECASE))
+                        if match_last_center:
+                            last_center_idx = match_last_center[-1].start()
+                            html = html[:last_center_idx] + extracted_images + html[last_center_idx:]
+
                 match_parts = re.search(r"●純正品番.*?<\s*br\s*[^>]*>([\x00-\x7F\xA1-\xDF]*)", add1, flags=re.IGNORECASE | re.DOTALL)
                 parts_exists = False
                 if match_parts:
@@ -483,6 +498,21 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">')
                     
                 import re
+                
+                match_center = re.search(r"<\s*center\s*>(.*?)<\s*/center\s*>", add1, flags=re.IGNORECASE | re.DOTALL)
+                if match_center:
+                    center_inner = match_center.group(1)
+                    img_matches = list(re.finditer(r"<\s*img\b[^>]*>", center_inner, flags=re.IGNORECASE))
+                    if len(img_matches) >= 3:
+                        second_img_end = img_matches[1].end()
+                        extracted_images = center_inner[second_img_end:]
+                        extracted_images = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", extracted_images)
+                        
+                        match_last_center = list(re.finditer(r"<\s*/center\s*>", html, flags=re.IGNORECASE))
+                        if match_last_center:
+                            last_center_idx = match_last_center[-1].start()
+                            html = html[:last_center_idx] + extracted_images + html[last_center_idx:]
+
                 match_parts = re.search(r"●純正品番.*?<\s*br\s*[^>]*>([\x00-\x7F\xA1-\xDF]*)", add1, flags=re.IGNORECASE | re.DOTALL)
                 parts_exists = False
                 if match_parts:
