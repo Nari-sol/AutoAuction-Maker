@@ -159,12 +159,25 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 compressed_str = "\n".join(extracted_lines)
                 
                 html = html_template
+                
+                is_clickpost_row = False
+                try:
+                    if int(float(out_row.get('postage-set', 0))) == 6:
+                        is_clickpost_row = True
+                except (ValueError, TypeError):
+                    pass
+                    
                 if "14週間" in add1:
                     html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
-                if "parts010.gif" in add1:
-                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">')
-                if "supplies" in add1:
-                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">')
+                
+                current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
+                if "parts010.gif" in add1 or "supplies" in add1:
+                    new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
+                    html = html.replace(current_tekigou, new_tekigou)
+                    current_tekigou = new_tekigou
+                    
+                if is_clickpost_row:
+                    html = html.replace(current_tekigou, current_tekigou + '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/YO-post.jpg">')
                     
                 import re
                 
@@ -500,12 +513,24 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 add1 = str(out_row.get('additional1', ''))
                 html = html_template
                 
+                is_clickpost_row = False
+                try:
+                    if int(float(out_row.get('postage-set', 0))) == 6:
+                        is_clickpost_row = True
+                except (ValueError, TypeError):
+                    pass
+                
                 if "14週間" in add1:
                     html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
-                if "parts010.gif" in add1:
-                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">')
-                if "supplies" in add1:
-                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">')
+                
+                current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
+                if "parts010.gif" in add1 or "supplies" in add1:
+                    new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
+                    html = html.replace(current_tekigou, new_tekigou)
+                    current_tekigou = new_tekigou
+                    
+                if is_clickpost_row:
+                    html = html.replace(current_tekigou, current_tekigou + '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/YO-post.jpg">')
                     
                 import re
                 
