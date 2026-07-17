@@ -25,6 +25,7 @@ MAKER_LIST = [
     "マツダ", "メルセデス・ベンツ", "メルセデスベンツ", "ヤマハ", "ランチア", "ランドローバー", 
     "ランボルギーニ", "ルノー", "レクサス", "ロータス", "ローバー", "三菱ふそう", "三菱", 
     "日産", "日野自動車", "汎用タイプ", "スマート", "MINI", "コマツ", "DAIHATSU", "ベンツ","アルファロメオ"
+    "ニッサン"
 ]
 
 def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料別）", image_settings: dict = None) -> tuple[pd.DataFrame, int]:
