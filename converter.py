@@ -24,15 +24,11 @@ MAKER_LIST = [
     "フォード", "プジョー", "ベスパ", "ベントレー", "ホンダ", "ボルボ", "ポルシェ", "マセラティ", 
     "マツダ", "メルセデス・ベンツ", "メルセデスベンツ", "ヤマハ", "ランチア", "ランドローバー", 
     "ランボルギーニ", "ルノー", "レクサス", "ロータス", "ローバー", "三菱ふそう", "三菱", 
-    "日産", "日野自動車", "汎用タイプ", "スマート", "MINI", "コマツ", "DAIHATSU", "ベンツ","アルファロメオ",
-    "ニッサン"
+    "日産", "日野自動車", "汎用タイプ", "スマート", "MINI", "コマツ", "DAIHATSU", "ベンツ",
+    "アルファロメオ", "ALFA ROMEO", "OPEL", "ニッサン"
 ]
 
 def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料別）", image_settings: dict = None) -> tuple[pd.DataFrame, int]:
-    """
-    Yahooショッピングのデータフレームを受け取り、ヤフオクの一括出品用データフレームに変換する。
-    戻り値は (変換後のデータフレーム, スキップされた件数) のタプル。
-    """
     result_df = df.copy()
     
     price_col = pd.to_numeric(result_df.get('price', pd.Series([0]*len(result_df))), errors='coerce').fillna(0)
@@ -41,7 +37,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
     name_col = result_df.get('name', pd.Series(['']*len(result_df))).astype(str)
     
     if store_type == "競り3（3号店・送料込み）":
-        name_col = name_col.str.replace(r'送料185円[\s　]*', '', regex=True)
+        name_col = name_col.str.replace(r'送料185円[\s ]*', '', regex=True)
         result_df['name'] = name_col
         
     code_col = result_df.get('code', pd.Series(['']*len(result_df))).astype(str)
@@ -166,18 +162,27 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 compressed_str = "\n".join(extracted_lines)
                 
                 html = html_template
-                
                 is_clickpost_row = bool(out_row.get('_is_clickpost', False))
-                    
-                if "14週間" in add1:
-                    html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
                 
-                current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
-                if "parts010.gif" in add1 or "supplies" in add1:
-                    new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
-                    html = html.replace(current_tekigou, new_tekigou)
-                    current_tekigou = new_tekigou
-                    
+                if store_type != "競り3（3号店・送料込み）":
+                    html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">')
+                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">')
+
+                if "14週間" in add1:
+                    if store_type == "競り3（3号店・送料込み）":
+                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
+                    else:
+                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-14day.jpg">')
+
+                if store_type == "競り3（3号店・送料込み）":
+                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
+                    if "parts010.gif" in add1 or "supplies" in add1:
+                        new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
+                        html = html.replace(current_tekigou, new_tekigou)
+                        current_tekigou = new_tekigou
+                else:
+                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">'
+
                 if is_clickpost_row:
                     html = html.replace(current_tekigou, current_tekigou + '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/YO-post.jpg">')
                     
@@ -228,7 +233,12 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     else:
                         extracted_detail = ""
                         
-                search_link_block = f'<A HREF=https://auctions.yahoo.co.jp/seller/CYWC2j57DBqjcNEscUthj1EQCzRbG?p={clean_maker}&b=1&n=50&select=23 TARGET=new>その他{clean_maker}対応パーツはこちら</A><BR><BR><A HREF=https://auctions.yahoo.co.jp/seller/CYWC2j57DBqjcNEscUthj1EQCzRbG?b=1&is_postage_mode=1&n=50&select=23 TARGET=new>【当店ストアページ】</A>より、お探しの車種や純正品番からも検索いただけます！<BR><BR> <BR>'
+                if store_type == "競り3（3号店・送料込み）":
+                    seller_id = "CYWC2j57DBqjcNEscUthj1EQCzRbG"
+                else:
+                    seller_id = "FJ5NeS99SC8HDJ1PhPKRoqDWW62UG"
+                    
+                search_link_block = f'<A HREF="https://auctions.yahoo.co.jp/seller/{seller_id}?p={clean_maker}&b=1&n=50&select=23" TARGET="new">その他{clean_maker}対応パーツはこちら</A><BR><BR><A HREF="https://auctions.yahoo.co.jp/seller/{seller_id}?b=1&is_postage_mode=1&n=50&select=23" TARGET="new">【当店ストアページ】</A>より、お探しの車種や純正品番からも検索いただけます！<BR><BR> <BR>'
                 
                 html_display_maker = maker_name_ext if maker_name_ext else clean_maker
                 new_block_full = (
@@ -255,7 +265,6 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 html = html.replace('【適合車種】', html_cars)
                 html = re.sub(r"(?i)(?:<\s*br\s*[^>]*>\s*){4}", "<BR><BR>", html)
                 
-                # 保証案内の追加
                 if store_type == "競り3（3号店・送料込み）":
                     guarantee_url = "https://store.shopping.yahoo.co.jp/solltd3/solpage01.html"
                 else:
@@ -358,7 +367,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
             grouped_for_merge = {}
             for maker, line_str in extracted_lines_all:
                 import re
-                parts = re.split(r'[ 　]+', line_str, maxsplit=1)
+                parts = re.split(r'[  ]+', line_str, maxsplit=1)
                 car_name = parts[0]
                 model_name = parts[1] if len(parts) > 1 else ""
                 
@@ -395,7 +404,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 raw_title = raw_title.replace(m, "")
             for _, line_str in elements:
                 import re
-                parts = re.split(r'[ 　]+', line_str)
+                parts = re.split(r'[  ]+', line_str)
                 for p in parts:
                     raw_title = raw_title.replace(p, "")
             base_title = re.sub(r"\s+", " ", raw_title).strip()
@@ -505,7 +514,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                         mid = f"{current_cars} " if current_cars else ""
                         
                         import re
-                        base_blocks = re.split(r'[ 　]+', base_title)
+                        base_blocks = re.split(r'[  ]+', base_title)
                         while len(base_blocks) > 0:
                             base_blocks.pop()
                             current_base = " ".join(base_blocks)
@@ -523,15 +532,25 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 
                 is_clickpost_row = bool(out_row.get('_is_clickpost', False))
                 
+                if store_type != "競り3（3号店・送料込み）":
+                    html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">')
+                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">')
+
                 if "14週間" in add1:
-                    html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
-                
-                current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
-                if "parts010.gif" in add1 or "supplies" in add1:
-                    new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
-                    html = html.replace(current_tekigou, new_tekigou)
-                    current_tekigou = new_tekigou
-                    
+                    if store_type == "競り3（3号店・送料込み）":
+                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
+                    else:
+                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-14day.jpg">')
+
+                if store_type == "競り3（3号店・送料込み）":
+                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
+                    if "parts010.gif" in add1 or "supplies" in add1:
+                        new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
+                        html = html.replace(current_tekigou, new_tekigou)
+                        current_tekigou = new_tekigou
+                else:
+                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">'
+
                 if is_clickpost_row:
                     html = html.replace(current_tekigou, current_tekigou + '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/YO-post.jpg">')
                     
@@ -599,7 +618,12 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     else:
                         extracted_detail = ""
                         
-                search_link_block = f'<A HREF=https://auctions.yahoo.co.jp/seller/CYWC2j57DBqjcNEscUthj1EQCzRbG?p={clean_maker}&b=1&n=50&select=23 TARGET=new>その他{clean_maker}対応パーツはこちら</A><BR><BR><A HREF=https://auctions.yahoo.co.jp/seller/CYWC2j57DBqjcNEscUthj1EQCzRbG?b=1&is_postage_mode=1&n=50&select=23 TARGET=new>【当店ストアページ】</A>より、お探しの車種や純正品番からも検索いただけます！<BR><BR> <BR>'
+                if store_type == "競り3（3号店・送料込み）":
+                    seller_id = "CYWC2j57DBqjcNEscUthj1EQCzRbG"
+                else:
+                    seller_id = "FJ5NeS99SC8HDJ1PhPKRoqDWW62UG"
+                    
+                search_link_block = f'<A HREF="https://auctions.yahoo.co.jp/seller/{seller_id}?p={clean_maker}&b=1&n=50&select=23" TARGET="new">その他{clean_maker}対応パーツはこちら</A><BR><BR><A HREF="https://auctions.yahoo.co.jp/seller/{seller_id}?b=1&is_postage_mode=1&n=50&select=23" TARGET="new">【当店ストアページ】</A>より、お探しの車種や純正品番からも検索いただけます！<BR><BR> <BR>'
                 
                 html_display_maker = maker if (maker is not None and maker != "COMBINED") else clean_maker
                 new_block_full = (
@@ -627,7 +651,6 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 
                 html = re.sub(r"(?i)(?:<\s*br\s*[^>]*>\s*){4}", "<BR><BR>", html)
                 
-                # 保証案内の追加
                 if store_type == "競り3（3号店・送料込み）":
                     guarantee_url = "https://store.shopping.yahoo.co.jp/solltd3/solpage01.html"
                 else:
@@ -699,7 +722,6 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
             if val.strip():
                 final_result_df[col_name] = val
 
-    # 画像コメントクリーンアップ処理
     for i in range(1, 11):
         img_col = f"画像{i}"
         comment_col = f"画像{i}コメント"
