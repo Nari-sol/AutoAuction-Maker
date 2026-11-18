@@ -28,6 +28,141 @@ MAKER_LIST = [
     "アルファロメオ", "ALFA ROMEO", "OPEL", "ニッサン"
 ]
 
+MAKER_ALIAS_MAP = {
+    "MAZDA": "マツダ",
+    "NISSAN": "日産",
+    "ニッサン": "日産",
+    "TOYOTA": "トヨタ",
+    "HONDA": "ホンダ",
+    "SUBARU": "スバル",
+    "SUZUKI": "スズキ",
+    "MITSUBISHI": "三菱",
+    "DAIHATSU": "ダイハツ",
+    "ISUZU": "いすゞ",
+    "LEXUS": "レクサス",
+    "MERCEDES": "メルセデス・ベンツ",
+    "BENZ": "メルセデス・ベンツ",
+    "メルセデスベンツ": "メルセデス・ベンツ",
+    "VOLKSWAGEN": "フォルクスワーゲン",
+    "VW": "フォルクスワーゲン",
+    "AUDI": "アウディ",
+    "PEUGEOT": "プジョー",
+    "RENAULT": "ルノー",
+    "CITROEN": "シトロエン",
+    "FIAT": "フィアット",
+    "ALFA ROMEO": "アルファ ロメオ",
+    "アルファロメオ": "アルファ ロメオ",
+    "OPEL": "オペル",
+    "VOLVO": "ボルボ",
+    "PORSCHE": "ポルシェ",
+    "JAGUAR": "ジャガー",
+    "LAND ROVER": "ランドローバー",
+    "FORD": "フォード",
+    "CHEVROLET": "シボレー",
+    "CHRYSLER": "クライスラー",
+    "JEEP": "ジープ",
+    "FERRARI": "フェラーリ",
+    "MASERATI": "マセラティ",
+    "BENTLEY": "ベントレー",
+    "ASTON MARTIN": "アストンマーティン",
+    "LAMBORGHINI": "ランボルギーニ",
+    "LOTUS": "ロータス",
+    "ROVER": "ローバー",
+    "SAAB": "サーブ",
+    "SMART": "スマート",
+    "ABARTH": "アバルト",
+    "HYUNDAI": "ヒュンダイ",
+    "TESLA": "テスラ",
+    "BMW": "BMW",
+    "MINI": "MINI",
+}
+
+_SOL_NOTICE_PATTERN = re.compile(
+    r'(?:<\s*b\s*>\s*)?<\s*a\b[^>]*>\s*SOL商品検索サイト\s*<\s*/a\s*>(?:\s*<\s*/b\s*>)?.*?（検索ボックスに下記の純正品番を入れて下さい）。?\s*(?:<\s*br\s*[^>]*>\s*)*',
+    flags=re.IGNORECASE | re.DOTALL,
+)
+
+def remove_sol_search_notice(add1: str) -> str:
+    """additional1 から SOL商品検索サイト案内文のHTMLブロックを削除する。"""
+    return _SOL_NOTICE_PATTERN.sub('', add1)
+
+def extract_clean_maker(target_text: str) -> str:
+    """対象テキストから正式なメーカー名（英語表記は日本語へ変換）を抽出する。"""
+    if not target_text:
+        return ""
+    for m in MAKER_LIST:
+        if m in target_text:
+            return MAKER_ALIAS_MAP.get(m.upper(), MAKER_ALIAS_MAP.get(m, m))
+    for alias in sorted(MAKER_ALIAS_MAP.keys(), key=len, reverse=True):
+        if re.fullmatch(r'[A-Za-z0-9 ]+', alias):
+            if re.search(rf'(?<![A-Za-z]){re.escape(alias)}(?![A-Za-z])', target_text, flags=re.IGNORECASE):
+                return MAKER_ALIAS_MAP[alias]
+        elif alias in target_text:
+            return MAKER_ALIAS_MAP[alias]
+    return ""
+
+def build_base_html(html_template: str, store_type: str, add1: str, is_clickpost_row: bool) -> str:
+    """店舗種別と商品条件に応じてテーブル装飾・バナー・追加画像・純正品番を反映したベースHTMLを組み立てる。"""
+    html = html_template
+    is_store3 = (store_type == "競り3（3号店・送料込み）")
+
+    if not is_store3:
+        html = html.replace(
+            'BORDER="1" WIDTH="100%" CELLPADDING="8" CELLSPACING="0" BORDERCOLOR="#D4AF37"',
+            'BORDER="1" WIDTH="100%" CELLPADDING="8" CELLSPACING="0"',
+        )
+        html = html.replace('BGCOLOR="#B40000"', 'BGCOLOR="#302833"')
+
+    add1_lower = add1.lower()
+    is_14day = any(kw in add1_lower for kw in ("14週間", "14日", "１４日", "14day"))
+    is_incompatible = is_14day or ("parts010.gif" in add1_lower) or ("supplies" in add1_lower)
+
+    if is_store3:
+        banner1 = "14day.jpg" if is_14day else "6month.jpg"
+        banner2 = "tekigou2.jpg" if is_incompatible else "tekigou.jpg"
+    else:
+        banner1 = "1-14day.jpg" if is_14day else "1-6month.jpg"
+        banner2 = "1-tekigou2.jpg" if is_incompatible else "1-tekigou.jpg"
+
+    html = html.replace(
+        '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">',
+        f'<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/{banner1}">',
+    )
+
+    tekigou_placeholder = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
+    tekigou_replacement = f'<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/{banner2}">'
+    if is_clickpost_row:
+        tekigou_replacement += '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/YO-post.jpg">'
+    html = html.replace(tekigou_placeholder, tekigou_replacement)
+
+    match_center = re.search(r"<\s*center\s*>(.*?)<\s*/center\s*>", add1, flags=re.IGNORECASE | re.DOTALL)
+    if match_center:
+        center_inner = match_center.group(1)
+        img_matches = list(re.finditer(r"<\s*img\b[^>]*>", center_inner, flags=re.IGNORECASE))
+        if len(img_matches) >= 3:
+            second_img_end = img_matches[1].end()
+            extracted_images = center_inner[second_img_end:]
+            extracted_images = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", extracted_images)
+
+            match_last_center = list(re.finditer(r"<\s*/center\s*>", html, flags=re.IGNORECASE))
+            if match_last_center:
+                last_center_idx = match_last_center[-1].start()
+                html = html[:last_center_idx] + extracted_images + html[last_center_idx:]
+
+    match_parts = re.search(r"●純正品番.*?<\s*br\s*[^>]*>(.*?)(?=(?:<[^>]+>\s*)*●|$)", add1, flags=re.IGNORECASE | re.DOTALL)
+    parts_exists = False
+    if match_parts:
+        ext_parts = match_parts.group(1)
+        ext_parts = re.sub(r"(?i)^(?:<\s*br\s*[^>]*>|\s)+", "", ext_parts)
+        ext_parts = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", ext_parts)
+        if ext_parts and ext_parts not in ["-", "－"]:
+            parts_exists = True
+            html = html.replace('【純正品番】', ext_parts)
+    if not parts_exists:
+        html = re.sub(r"<\s*tr[^>]*>(?:(?!<\s*/?tr[^>]*>).)*?【純正品番】.*?<\s*/tr\s*>", "", html, flags=re.IGNORECASE | re.DOTALL)
+
+    return html
+
 def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料別）", image_settings: dict = None) -> tuple[pd.DataFrame, int]:
     result_df = df.copy()
     
@@ -37,8 +172,10 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
     name_col = result_df.get('name', pd.Series(['']*len(result_df))).astype(str)
     
     if store_type == "競り3（3号店・送料込み）":
+        name_col = name_col.str.replace(r'送料(?:185|240)円[\s ]*', '', regex=True)
+    else:
         name_col = name_col.str.replace(r'送料185円[\s ]*', '', regex=True)
-        result_df['name'] = name_col
+    result_df['name'] = name_col
         
     code_col = result_df.get('code', pd.Series(['']*len(result_df))).astype(str)
     
@@ -82,7 +219,6 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
         result_df['開始価格'] = price_col.astype(int)
         is_clickpost = (postage_set_col == 6)
         result_df.loc[is_clickpost, '重量設定'] = 0
-        result_df.loc[is_clickpost, 'タイトル'] = "送料185円 " + name_col[is_clickpost]
         result_df['suffix'] = ""
 
     result_df['_is_clickpost'] = (postage_set_col == 6)
@@ -131,7 +267,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     else:
                         out_row['管理番号'] = ""
                         
-                add1 = str(out_row.get('additional1', ''))
+                add1 = remove_sol_search_notice(str(out_row.get('additional1', '')))
                 target_block_start = ""
                 if "【商品詳細】" in add1:
                     after_detail = add1.split("【商品詳細】", 1)[1]
@@ -161,65 +297,11 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                                 
                 compressed_str = "\n".join(extracted_lines)
                 
-                html = html_template
                 is_clickpost_row = bool(out_row.get('_is_clickpost', False))
-                
-                if store_type != "競り3（3号店・送料込み）":
-                    html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">')
-                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">')
-
-                if "14週間" in add1:
-                    if store_type == "競り3（3号店・送料込み）":
-                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
-                    else:
-                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-14day.jpg">')
-
-                if store_type == "競り3（3号店・送料込み）":
-                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
-                    if "parts010.gif" in add1 or "supplies" in add1:
-                        new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
-                        html = html.replace(current_tekigou, new_tekigou)
-                        current_tekigou = new_tekigou
-                else:
-                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">'
-
-                if is_clickpost_row:
-                    html = html.replace(current_tekigou, current_tekigou + '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/YO-post.jpg">')
-                    
-                import re
-                
-                match_center = re.search(r"<\s*center\s*>(.*?)<\s*/center\s*>", add1, flags=re.IGNORECASE | re.DOTALL)
-                if match_center:
-                    center_inner = match_center.group(1)
-                    img_matches = list(re.finditer(r"<\s*img\b[^>]*>", center_inner, flags=re.IGNORECASE))
-                    if len(img_matches) >= 3:
-                        second_img_end = img_matches[1].end()
-                        extracted_images = center_inner[second_img_end:]
-                        extracted_images = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", extracted_images)
-                        
-                        match_last_center = list(re.finditer(r"<\s*/center\s*>", html, flags=re.IGNORECASE))
-                        if match_last_center:
-                            last_center_idx = match_last_center[-1].start()
-                            html = html[:last_center_idx] + extracted_images + html[last_center_idx:]
-
-                match_parts = re.search(r"●純正品番.*?<\s*br\s*[^>]*>(.*?)(?=(?:<[^>]+>\s*)*●|$)", add1, flags=re.IGNORECASE | re.DOTALL)
-                parts_exists = False
-                if match_parts:
-                    ext_parts = match_parts.group(1)
-                    ext_parts = re.sub(r"(?i)^(?:<\s*br\s*[^>]*>|\s)+", "", ext_parts)
-                    ext_parts = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", ext_parts)
-                    if ext_parts and ext_parts not in ["-", "－"]:
-                        parts_exists = True
-                        html = html.replace('【純正品番】', ext_parts)
-                if not parts_exists:
-                    html = re.sub(r"<\s*tr[^>]*>(?:(?!<\s*/?tr[^>]*>).)*?【純正品番】.*?<\s*/tr\s*>", "", html, flags=re.IGNORECASE | re.DOTALL)
+                html = build_base_html(html_template, store_type, add1, is_clickpost_row)
                     
                 target_text = maker_name_ext if maker_name_ext else add1
-                clean_maker = ""
-                for m in MAKER_LIST:
-                    if m in target_text:
-                        clean_maker = "ダイハツ" if m == "DAIHATSU" else "メルセデス・ベンツ" if m == "メルセデスベンツ" else m
-                        break
+                clean_maker = extract_clean_maker(target_text)
                         
                 html_cars = compressed_str.replace('\n', '<BR>') if compressed_str else ""
                 
@@ -258,8 +340,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     
                 html = html + extracted_detail
                 
-                if clean_maker:
-                    html = html.replace('【メーカー】', html_display_maker)
+                html = html.replace('【メーカー】', html_display_maker if html_display_maker else '')
                     
                 html_cars = compressed_str.replace('\n', '<BR>') if compressed_str else ""
                 html = html.replace('【適合車種】', html_cars)
@@ -332,7 +413,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
             extracted_lines_all = []
             
             for _, row in group.iterrows():
-                add1 = str(row.get('additional1', ''))
+                add1 = remove_sol_search_notice(str(row.get('additional1', '')))
                 target_block_start = ""
                 if "【商品詳細】" in add1:
                     after_detail = add1.split("【商品詳細】", 1)[1]
@@ -527,60 +608,9 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                 
                 out_row['タイトル'] = final_title
                 
-                add1 = str(out_row.get('additional1', ''))
-                html = html_template
-                
+                add1 = remove_sol_search_notice(str(out_row.get('additional1', '')))
                 is_clickpost_row = bool(out_row.get('_is_clickpost', False))
-                
-                if store_type != "競り3（3号店・送料込み）":
-                    html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">')
-                    html = html.replace('<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">', '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">')
-
-                if "14週間" in add1:
-                    if store_type == "競り3（3号店・送料込み）":
-                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/14day.jpg">')
-                    else:
-                        html = html.replace('<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-6month.jpg">', '<CENTER><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-14day.jpg">')
-
-                if store_type == "競り3（3号店・送料込み）":
-                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou.jpg">'
-                    if "parts010.gif" in add1 or "supplies" in add1:
-                        new_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/tekigou2.jpg">'
-                        html = html.replace(current_tekigou, new_tekigou)
-                        current_tekigou = new_tekigou
-                else:
-                    current_tekigou = '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/1-tekigou2.jpg">'
-
-                if is_clickpost_row:
-                    html = html.replace(current_tekigou, current_tekigou + '<BR><BR><IMG SRC="https://shopping.c.yimg.jp/lib/solltd/YO-post.jpg">')
-                    
-                import re
-                
-                match_center = re.search(r"<\s*center\s*>(.*?)<\s*/center\s*>", add1, flags=re.IGNORECASE | re.DOTALL)
-                if match_center:
-                    center_inner = match_center.group(1)
-                    img_matches = list(re.finditer(r"<\s*img\b[^>]*>", center_inner, flags=re.IGNORECASE))
-                    if len(img_matches) >= 3:
-                        second_img_end = img_matches[1].end()
-                        extracted_images = center_inner[second_img_end:]
-                        extracted_images = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", extracted_images)
-                        
-                        match_last_center = list(re.finditer(r"<\s*/center\s*>", html, flags=re.IGNORECASE))
-                        if match_last_center:
-                            last_center_idx = match_last_center[-1].start()
-                            html = html[:last_center_idx] + extracted_images + html[last_center_idx:]
-
-                match_parts = re.search(r"●純正品番.*?<\s*br\s*[^>]*>(.*?)(?=(?:<[^>]+>\s*)*●|$)", add1, flags=re.IGNORECASE | re.DOTALL)
-                parts_exists = False
-                if match_parts:
-                    ext_parts = match_parts.group(1)
-                    ext_parts = re.sub(r"(?i)^(?:<\s*br\s*[^>]*>|\s)+", "", ext_parts)
-                    ext_parts = re.sub(r"(?i)(?:<\s*br\s*[^>]*>|\s)+$", "", ext_parts)
-                    if ext_parts and ext_parts not in ["-", "－"]:
-                        parts_exists = True
-                        html = html.replace('【純正品番】', ext_parts)
-                if not parts_exists:
-                    html = re.sub(r"<\s*tr[^>]*>(?:(?!<\s*/?tr[^>]*>).)*?【純正品番】.*?<\s*/tr\s*>", "", html, flags=re.IGNORECASE | re.DOTALL)
+                html = build_base_html(html_template, store_type, add1, is_clickpost_row)
                     
                 target_block_start = ""
                 if "【商品詳細】" in add1:
@@ -600,11 +630,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     block_content = target_block_start[:end_match.start()] if end_match else target_block_start
 
                 target_text = maker if (maker is not None and maker != "COMBINED") else add1
-                clean_maker = ""
-                for m in MAKER_LIST:
-                    if m in target_text:
-                        clean_maker = "ダイハツ" if m == "DAIHATSU" else "メルセデス・ベンツ" if m == "メルセデスベンツ" else m
-                        break
+                clean_maker = extract_clean_maker(target_text)
                         
                 html_cars = compressed_str.replace('\n', '<BR>') if compressed_str else ""
                 
@@ -643,8 +669,7 @@ def process_csv(df: pd.DataFrame, store_type: str = "競り1（1号店・送料�
                     
                 html = html + extracted_detail
                 
-                if clean_maker:
-                    html = html.replace('【メーカー】', html_display_maker)
+                html = html.replace('【メーカー】', html_display_maker if html_display_maker else '')
                     
                 html_cars = compressed_str.replace('\n', '<BR>') if compressed_str else ""
                 html = html.replace('【適合車種】', html_cars)
